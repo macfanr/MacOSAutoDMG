@@ -1,4 +1,4 @@
 MacOSAutoDMG
 ============
 
-auto create a DMG file for a number Applications
+auto create the DMG files for a number Applications
