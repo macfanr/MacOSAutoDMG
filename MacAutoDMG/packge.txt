@@ -1,0 +1,134 @@
+on DoShell(shell)
+	log shell
+	set theResult to ""
+	set theResult to do shell script (shell as string)
+	return theResult
+end DoShell
+
+on CorrectString(istring)
+	return "\"" & istring & "\""
+end CorrectString
+
+on CreateTempDMG(dmgNameWithPath, diskName)
+	set shellContent to "hdiutil create -megabytes 100 -fs HFS+ -volname"
+	set shellContent to shellContent & " " & my CorrectString(diskName) & " " & my CorrectString(dmgNameWithPath)
+	my DoShell(shellContent)
+end CreateTempDMG
+
+on MountDMGFile(dmgNameWithPath)
+	set shellContent to "hdiutil mount" & " " & my CorrectString(dmgNameWithPath)
+	my DoShell(shellContent)
+end MountDMGFile
+
+on ReadyBackgroundImage(bgFileNameWithPath, backgroundImageName, diskName)
+	set hidenFileNameWithPath to my CorrectString("/Volumes/" & diskName & "/." & backgroundImageName)
+	
+	set shellContent to "cp" & " " & my CorrectString(bgFileNameWithPath) & " " & my CorrectString("/Volumes/" & diskName)
+	my DoShell(shellContent)
+	
+	set shellContent to "mv" & " " & my CorrectString("/Volumes/" & diskName & "/" & backgroundImageName) & " " & hidenFileNameWithPath
+	my DoShell(shellContent)
+	
+	set shellContent to "ln -s" & " " & hidenFileNameWithPath & " " & my CorrectString("/Volumes/" & diskName & "/t.jpg")
+	my DoShell(shellContent)
+	
+end ReadyBackgroundImage
+
+on AddAppToDisk(diskName, appNameWithPath)
+	set shellContent to "cp -r" & " " & my CorrectString(appNameWithPath) & " " & my CorrectString("/Volumes/" & diskName)
+	my DoShell(shellContent)
+end AddAppToDisk
+
+on SetDiskAttribute(diskName, appName)
+	tell application "Finder"
+		
+		if exists disk diskName then
+			tell disk diskName
+				open
+				
+				set position of item appName of container window to {180, 95}
+				set current view of container window to icon view
+				set toolbar visible of container window to false
+				set statusbar visible of container window to false
+				set the bounds of container window to {650, 280, 1000, 725}
+				set theViewOptions to the icon view options of container window
+				set arrangement of theViewOptions to not arranged
+				set icon size of theViewOptions to 128
+				set background picture of theViewOptions to file "t.jpg"
+				
+				make new alias file at container window to POSIX file "/Applications" with properties {name:"Applications"}
+				set position of item "Applications" of container window to {180, 300}
+				
+				update without registering applications
+				delay 1
+				
+				close
+			end tell
+		end if
+		
+	end tell
+end SetDiskAttribute
+
+on ClearUpTempDiskContent(diskName, finalDiskName)
+	set shellContent to "mv" & " " & my CorrectString("/Volumes/" & diskName & "/t.jpg") & " " & my CorrectString("/Volumes/" & diskName & "/.t.jpg")
+	my DoShell(shellContent)
+end ClearUpTempDiskContent
+
+on UnMountTempDMG(dmgNameWithPath, diskName)
+	set shellContent to "diskutil eject" & " " & my CorrectString("/Volumes/" & diskName)
+	my DoShell(shellContent)
+	--set shellContent to "hdiutil unmount " & my CorrectString(dmgNameWithPath)
+	--my DoShell(shellContent)
+end UnMountTempDMG
+
+on CreateFinalDMGFile(tempDMGNameWithPath, finalDMGNameWithPath)
+	set shellContent to "hdiutil convert" & " " & my CorrectString(tempDMGNameWithPath) & " " & "-format UDZO -imagekey zlib-level=9 -o" & " " & my CorrectString(finalDMGNameWithPath)
+	my DoShell(shellContent)
+end CreateFinalDMGFile
+
+on ClearMyWork(tempDMGNameWithPath)
+	set shellContent to "rm -rf" & " " & my CorrectString(tempDMGNameWithPath)
+	my DoShell(shellContent)
+end ClearMyWork
+
+on CodeSignApp(devID, appnameWithPath)
+    #try
+        if the length of devID is greater than 1 then
+            set shellContent to "codesign -f -s" & " " & my CorrectString(devID) & " " & "-v" & " " & my CorrectString(appnameWithPath)
+            my DoShell(shellContent)
+        end if
+    #end try
+end CodeSignApp
+
+on StartCreateDMGFile(appNameWithPath, appName, tmpDMGNameWithPath, tmpDiskName, backgroundImageWithPath, backgroundImageName, finalDMGNameWithPath, devID)
+
+    my CodeSignApp(devID,appNameWithPath)
+	my CreateTempDMG(tmpDMGNameWithPath, tmpDiskName)
+	my MountDMGFile(tmpDMGNameWithPath)
+	
+	my ReadyBackgroundImage(backgroundImageWithPath, backgroundImageName, tmpDiskName)
+	my AddAppToDisk(tmpDiskName, appNameWithPath)
+	my SetDiskAttribute(tmpDiskName, appName)
+	my ClearUpTempDiskContent(tmpDiskName, appName)
+	my UnMountTempDMG(tmpDMGNameWithPath, tmpDiskName)
+	my CreateFinalDMGFile(tmpDMGNameWithPath, finalDMGNameWithPath)
+	my ClearMyWork(tmpDMGNameWithPath)
+	
+end StartCreateDMGFile
+
+------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------
+
+set appNameWithPath to "MM_APP_PATH_NAME"
+set appName to "MM_APP_NAME"
+
+set backgroundImageWithPath to "MM_BACK_IMAGE_PATH_NAME"
+set backgroundImageName to "MM_BACK_IMAGE_NAME"
+
+set finalDMGNameWithPath to "MM_FINAL_DMG_PATH_NAME"
+
+set tmpDMGNameWithPath to "MM_TMP_DMG_PATH_NAME"
+set tmpDiskName to "MM_DISK_NAME"
+set developerID to "MM_DEV_ID"
+
+my StartCreateDMGFile(appNameWithPath, appName, tmpDMGNameWithPath, tmpDiskName, backgroundImageWithPath, backgroundImageName, finalDMGNameWithPath, developerID)
